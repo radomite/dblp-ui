@@ -132,7 +132,7 @@ def group_results(conn, hits):
     return groups
 
 
-def search(conn, q="", author="", venue="", year_from=None, year_to=None, record_type="", limit=20, offset=0, sort="relevance", category=""):
+def search(conn, q="", author="", venue="", year_from=None, year_to=None, record_type="", limit=20, offset=0, sort="relevance", category="", author_exact=False):
     clauses, params = [], []
     q = q.strip()
     author = author.strip().casefold()
@@ -156,8 +156,12 @@ def search(conn, q="", author="", venue="", year_from=None, year_to=None, record
         clauses.append("pub_fts MATCH ?")
         params.append(" AND ".join(fts))
     if author and fts:
-        clauses.append("EXISTS (SELECT 1 FROM publication_authors a WHERE a.publication_id=p.id AND a.name_norm>=? AND a.name_norm<?)")
-        params.extend([author, author + "\uffff"])
+        if author_exact:
+            clauses.append("EXISTS (SELECT 1 FROM publication_authors a WHERE a.publication_id=p.id AND a.name_norm=?)")
+            params.append(author)
+        else:
+            clauses.append("EXISTS (SELECT 1 FROM publication_authors a WHERE a.publication_id=p.id AND a.name_norm>=? AND a.name_norm<?)")
+            params.extend([author, author + "\uffff"])
     if year_from is not None:
         clauses.append("p.year>=?")
         params.append(year_from)
@@ -201,8 +205,12 @@ def search(conn, q="", author="", venue="", year_from=None, year_to=None, record
             return {"results": [], "has_more": False}
     join = "JOIN pub_fts ON pub_fts.rowid=p.id" if fts else ""
     if author and not fts:
-        clauses.append("p.id IN (SELECT publication_id FROM publication_authors WHERE name_norm>=? AND name_norm<?)")
-        params.extend([author, author + "\uffff"])
+        if author_exact:
+            clauses.append("p.id IN (SELECT publication_id FROM publication_authors WHERE name_norm=?)")
+            params.append(author)
+        else:
+            clauses.append("p.id IN (SELECT publication_id FROM publication_authors WHERE name_norm>=? AND name_norm<?)")
+            params.extend([author, author + "\uffff"])
     where = " AND ".join(clauses)
     if sort == "year_desc":
         order = "p.year DESC, p.id DESC"

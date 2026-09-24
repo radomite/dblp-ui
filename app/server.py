@@ -81,6 +81,7 @@ class Handler(BaseHTTPRequestHandler):
                         conn, get("q"), get("author"), get("venue"), integer(params, "year_from", low=0, high=9999),
                         integer(params, "year_to", low=0, high=9999), get("type"),
                         integer(params, "limit", 300 if get("author") else 20, 1, 300), integer(params, "offset", 0, 0, 1000000), get("sort", "relevance"), get("category"),
+                        get("author_exact") == "1",
                     )
                 elif parsed.path == "/api/autocomplete":
                     kind = get("kind", "title")

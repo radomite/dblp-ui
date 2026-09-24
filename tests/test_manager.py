@@ -64,6 +64,12 @@ XML = b'''<?xml version="1.0" encoding="ISO-8859-1"?>
 <author>Cryptographer Example</author><title>A sample IACR preprint.</title><year>2024</year>
 <journal>IACR Cryptol. ePrint Arch.</journal>
 </article>
+<article key="journals/example/Twelve" mdate="2026-01-11">
+<author>Martin Grohe</author><title>Distinct author lookup.</title><year>2024</year><journal>Example Journal</journal>
+</article>
+<article key="journals/example/Thirteen" mdate="2026-01-12">
+<author>Martin Groher</author><title>Distinct author lookup.</title><year>2025</year><journal>Example Journal</journal>
+</article>
 </dblp>'''
 
 
@@ -187,6 +193,9 @@ class ManagerTests(unittest.TestCase):
                 self.assertEqual({group["dblp_key"] for group in search(conn, author="Ada Example", category="monograph,artifact")["results"]}, {"books/example/Six", "data/example/Seven"})
                 self.assertEqual(search(conn, category="informal")["results"][0]["version_count"], 3)
                 self.assertEqual(search(conn, q="sample IACR", category="informal")["results"][0]["reference_type"], "preprint")
+                self.assertEqual(len(search(conn, author="Martin Grohe")["results"]), 2)
+                self.assertEqual([item["dblp_key"] for item in search(conn, author="Martin Grohe", author_exact=True)["results"]], ["journals/example/Twelve"])
+                self.assertEqual([item["dblp_key"] for item in search(conn, q="distinct author", author="Martin Grohe", author_exact=True)["results"]], ["journals/example/Twelve"])
                 self.assertFalse(search(conn, q="sample IACR", category="journal")["results"])
                 self.assertFalse(search(conn, category="journal", q="algorithm data artifact")["results"])
                 self.assertEqual(sorted(group["version_count"] for group in search(conn, q="Home Page")["results"]), [1, 2])
@@ -231,6 +240,8 @@ class ManagerTests(unittest.TestCase):
                         self.assertEqual(json.load(response)["results"][0]["dblp_key"], "data/example/Seven")
                     with urlopen(base + "/api/search?author=Ada%20Example&limit=300") as response:
                         self.assertTrue(json.load(response)["results"])
+                    with urlopen(base + "/api/search?author=Martin%20Grohe&author_exact=1") as response:
+                        self.assertEqual([item["dblp_key"] for item in json.load(response)["results"]], ["journals/example/Twelve"])
                     with urlopen(base + "/") as response:
                         self.assertIn("noindex", response.headers["X-Robots-Tag"])
                         html = response.read().decode("utf-8")
