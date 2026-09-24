@@ -1,60 +1,76 @@
-# Local dblp mirror
+# dblp UI
 
-A small web form and read-only JSON API over the dblp XML dump. The image contains only the application. On first start it downloads the archive from dblp and builds a search index in a persistent Docker volume.
+A self-hosted search page and JSON API for the [dblp XML data](https://dblp.org/xml/). The Docker image contains the application, not the data. On first start, it downloads a monthly XML snapshot and builds a SQLite index in a persistent volume. Searches and BibTeX checkout use that local index; they do not query dblp live.
 
-## Start
-
-From this directory, with Docker Compose installed:
+## Run
 
 ```sh
 docker compose up -d --build
 docker compose logs -f dblp
 ```
 
-Open <http://localhost:8080/>. Other group members on the same network can use `http://HOST_IP:8080/`. The form searches titles/topics and authors, including venue acronyms in the topic field. Publication type pills at the right edge of the search card filter journals, conferences, monographs, artifacts, informal publications, and other records; all are selected by default. Click a type to show only it, Shift-click to add another type, or click × to show all types again. Their counts show loaded result groups containing each type and update as more results load. Autocomplete ignores accents and diacritics, so `Daniel Marx` suggests `Dániel Marx`; author suggestions show names without publication counts. Scrolling loads more results automatically, ordered by the latest year in each group. Each result groups publications with identical authors and matching titles, allowing punctuation, common edition notes, and minor typos in titles (author order and letter case are ignored). Authors and title occupy two lines on the left; venue pills sit alongside them on the right, with the year beneath each venue. CoRR, Electron. Colloquium Comput. Complex., and IACR Cryptol. ePrint Arch. display as arXiv, ECCC, and IACR. IACR ePrint records count as informal publications. Colors are violet for journals, blue for conferences, yellow for monographs, brown for artifacts, and gray for informal publications. The pills show versions in priority order: journal, conference, then other types and preprints. Click a row to copy its preferred `DBLP:` key and add it to the cart, or click a venue pill to copy and add that version. Added rows are highlighted. Numeric suffixes on author names are hidden in the display. The compact cart beside Search can show its publications as rows, check out full BibTeX to clipboard or `.bib` download, or reset after confirmation. BibTeX is fetched only at checkout; cart keys persist in the browser's local storage. Set `DBLP_PORT` in a `.env` file to change the host port. The first download and import can take a long time and require substantial free disk space (plan for tens of GB). Watch progress with `docker compose logs -f dblp`. The web form and `/api/status` are available during indexing; search becomes available when the index is ready. Later starts reuse the index. A new index schema triggers a rebuild on deployment.
+Open <http://localhost:8080/>. Set `DBLP_PORT` in a `.env` file to change the host port. The first download and import take time and need tens of GB of free disk space. The page and `/api/status` are available during import; searches become available when `/api/status` reports `"ready": true`.
 
-The container chooses one random local time on days 1–3 of each month, between 01:00 and 03:59:59, to download the current archive again. The default timezone is `Europe/Berlin`; set `DBLP_TIMEZONE` in `.env` to another [IANA timezone](https://www.iana.org/time-zones) if needed. The chosen time is saved in the volume and survives restarts. If the container was stopped at that time, it updates when it starts again. Failed updates retry hourly. Searches remain available against the existing index while the new archive is downloaded and indexed. The index is replaced only after a successful import. If the downloaded bytes are identical, the existing index is retained. The temporary archive is deleted after each attempt.
+The service has no authentication. The page and API send `noindex` headers, but those do not restrict access. Add an authenticated reverse proxy if access should be limited.
 
-The default source is Dagstuhl's published monthly snapshot at `https://drops.dagstuhl.de/storage/artifacts/dblp/xml/{year}/dblp-{date}.xml.gz`; `{date}` expands to `YYYY-MM-01`. If the new monthly release is not available at the scheduled time, the service retries hourly. Set `DBLP_URL` in `.env` to change the source; `{year}`, `{month}`, and `{date}` are optional URL placeholders. The existing `dblp.xml.gz` in this folder is not mounted or included in the Docker image.
+## Search page
 
-The service has no authentication. Keep it on a trusted network, or put it behind your own authenticated reverse proxy before internet exposure.
+- Search titles, topics, venue acronyms, and authors. Author autocomplete ignores accents; for example, `Daniel Marx` suggests `Dániel Marx`.
+- Filter by journals, conferences, monographs, artifacts, informal publications, or other records. Click a type to select it, Shift-click to add types, or click × to show all types. Counts refer to result groups loaded so far.
+- Results load as you scroll and are ordered by their newest publication year. A row groups versions with the same complete author set and matching titles, allowing punctuation differences, common edition notes, and small typos.
+- Venue pills show the year below the venue. `CoRR`, `Electron. Colloquium Comput. Complex.`, and `IACR Cryptol. ePrint Arch.` display as `arXiv`, `ECCC`, and `IACR`. Informal publications, including IACR ePrint, are gray; journals are violet, conferences blue, artifacts brown, and monographs yellow.
+- Click a row to copy the preferred `DBLP:` key and add it to the citation cart. The default version favors a journal, then a conference. Click a venue pill to choose a specific version instead.
+- **Show** opens a cart-only view. **Checkout** collects full BibTeX entries and copies them to the clipboard or downloads a `.bib` file. Keys persist in the browser's local storage. Full BibTeX is fetched only at checkout.
+
+The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
+
+## Data refresh
+
+The app chooses one random local time on days 1–3 of each month between 01:00 and 03:59 to download the current snapshot. The default timezone is `Europe/Berlin`; set `DBLP_TIMEZONE` to another IANA timezone if needed. The scheduled time survives container restarts. Failed updates retry hourly.
+
+Searches continue to use the existing index during download and import. A new index replaces it only after a successful build; unchanged downloads keep the current index. Temporary archives are removed after each attempt.
+
+The default source is Dagstuhl's monthly snapshot:
+
+```text
+https://drops.dagstuhl.de/storage/artifacts/dblp/xml/{year}/dblp-{date}.xml.gz
+```
+
+`{date}` expands to `YYYY-MM-01`. Set `DBLP_URL` to override the source; `{year}`, `{month}`, and `{date}` are available as placeholders. A local `dblp.xml.gz` is neither mounted nor included in the image.
 
 ## API
 
-All endpoints are GET and return UTF-8 JSON.
+Responses are UTF-8 JSON. All endpoints are read-only; `/api/records` and `/api/bibtex` use POST to accept lists of keys.
 
-| Endpoint | Parameters | Purpose |
+| Method | Endpoint | Purpose |
 | --- | --- | --- |
-| `/api/status` | — | Index metadata, refresh phase, next update time, and last error if any |
-| `/api/search` | `q`, `author`, `venue`, `category`, `year_from`, `year_to`, `type`, `sort`, `limit`, `offset` | Search publications. `q` matches title, authors, venue, and venue acronyms. `author` matches an author name prefix. `venue` matches venue names and acronyms. `category` accepts a comma-separated subset of `journal`, `conference`, `monograph`, `artifact`, `informal`, and `other`; omit it for all types. The year parameters remain available in the API. `sort` is `relevance`, `year_desc`, or `year_asc`. Each result groups the same title and authors, with a preferred reference at top level and every matching publication in `versions`, including each version's `reference_type`. The response also has `has_more` and `next_offset`; use `next_offset` for the next request because `limit` counts matching publications before grouping. |
-| `/api/autocomplete` | `q`, `kind=title\|author`, `limit` | Title or author suggestions |
-| `/api/closest` | `q`, `limit` | Similar titles, including spelling errors; each result is a complete title group |
-| `/api/record` | `key` | One record by its dblp key, including people |
-| `POST /api/records` | JSON `{ "keys": ["journals/..."] }` | Return publication cards in key order, plus missing keys |
-| `POST /api/bibtex` | JSON `{ "keys": ["journals/..."] }` | Return full BibTeX entries in key order, plus any missing keys |
+| GET | `/api/status` | Index readiness, metadata, refresh state, and next update |
+| GET | `/api/search` | Search publication groups |
+| GET | `/api/autocomplete` | Title or author suggestions |
+| GET | `/api/closest` | Similar titles for a misspelled query |
+| GET | `/api/record` | One record, selected by `key` |
+| POST | `/api/records` | Records for a JSON body such as `{"keys":["journals/..."]}` |
+| POST | `/api/bibtex` | Full BibTeX for the same JSON body |
 
-Example:
+`/api/search` accepts `q`, `author`, `venue`, `category`, `year_from`, `year_to`, `type`, `sort`, `limit`, and `offset`. `category` is a comma-separated subset of `journal`, `conference`, `monograph`, `artifact`, `informal`, and `other`. `sort` can be `relevance` (default), `year_desc`, or `year_asc`. A query, author, venue, or category filter is needed to return results.
+
+Each search result contains the preferred reference at the top level and all matching publications in `versions`. `limit` counts matching publications before grouping, so a page can have fewer groups than its limit. Use `next_offset` for the next request while `has_more` is true. The default limit is 20, or 300 when `author` is supplied; the maximum is 300. The web page requests 300 records for the first author page and 20 for later pages.
 
 ```sh
-curl 'http://localhost:8080/api/search?q=graph+neural+network&limit=5'
-curl 'http://localhost:8080/api/search?venue=TODS&limit=5'
-curl 'http://localhost:8080/api/autocomplete?kind=author&q=Alan'
+curl 'http://localhost:8080/api/search?author=Avi%20Wigderson&sort=year_desc'
+curl 'http://localhost:8080/api/search?q=graph&category=journal,conference&limit=20'
+curl 'http://localhost:8080/api/autocomplete?kind=author&q=Daniel%20Marx'
 curl 'http://localhost:8080/api/closest?q=grph%20neural%20netwroks'
 ```
 
-`limit` defaults to 20 for search, or 300 when `author` is present, and is capped at 300. The web form requests 300 records for the first author search and 20 for later pages. Autocomplete and closest default to 10 and are capped at 25. `offset` is capped at 1,000,000. A query, author, or venue is required for `/api/search`. BibTeX is generated locally from the XML fields in the index and returned only by `/api/bibtex`, so checkout does not contact dblp.
+## Development
 
-## Local development
-
-On Linux, Python 3.13 and system timezone data are sufficient; no Python packages are needed. On Windows, install the Python `tzdata` package for `Europe/Berlin` or set `DBLP_TIMEZONE=UTC`. For a local archive you can still run the indexer directly:
+The application uses Python 3.13 and the standard library. Run the focused tests with:
 
 ```sh
-python -m app.importer
-python -m app.server
+python -m unittest discover -s tests
 ```
 
-For the automatic download and monthly scheduler, run `python -m app.manager` with `DBLP_DATA_DIR` and `DBLP_DB` pointing to a writable directory. `DBLP_HOST` and `DBLP_PORT` control the web binding. The import uses an offline copy of standard named character entities because the dump refers to `dblp.dtd`, which is not in this folder. The indexer parses the archive as XML and retains titles, authors/editors, year, venue, electronic edition, DOI link, record type, dblp key, and modification date. It does not store every XML field.
+For a local archive named `dblp.xml.gz`, run `python -m app.importer` and then `python -m app.server`. To run the download and scheduler without Docker, use `python -m app.manager` with `DBLP_DATA_DIR` and `DBLP_DB` set to writable paths. On Windows, install Python's `tzdata` package for `Europe/Berlin` or set `DBLP_TIMEZONE=UTC`.
 
-Run the focused tests with `python -m unittest discover -s tests`.
-
-Data source: [dblp XML dump](https://dblp.org/xml/), [dump format](https://dblp.uni-trier.de/faq/What%2Bdo%2BI%2Bfind%2Bin%2Bdblp%2Bxml.html), [parsing notes](https://dblp.uni-trier.de/faq/How%2Bto%2Bparse%2Bdblp%2Bxml.html). dblp metadata is released under CC0 1.0.
+Data format references: [dblp XML overview](https://dblp.uni-trier.de/faq/What%2Bdo%2BI%2Bfind%2Bin%2Bdblp%2Bxml.html) and [parsing notes](https://dblp.uni-trier.de/faq/How%2Bto%2Bparse%2Bdblp%2Bxml.html). dblp metadata is released under CC0 1.0.
