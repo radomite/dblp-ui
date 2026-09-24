@@ -17,10 +17,11 @@ The service has no authentication. The page and API send `noindex` headers, but 
 
 - Search titles, topics, venue acronyms, and authors. Author autocomplete ignores accents; for example, `Daniel Marx` suggests `Dániel Marx`.
 - Filter by journal, conference, monographs, artifacts, informal publications, or other records. Click a type to show only that type; click it again to show all types. Counts refer to result groups loaded so far, with `+` while more author results remain unread.
+- The URL records the title query, author, and selected type. Browser Back and Forward restore the search, and copied URLs reopen it.
 - Results load as you scroll and are ordered by their newest publication year. A row groups versions with the same complete author set and matching titles, allowing punctuation differences, common edition notes, and small typos.
 - Venue pills show the year below the venue. `CoRR`, `Electron. Colloquium Comput. Complex.`, and `IACR Cryptol. ePrint Arch.` display as `arXiv`, `ECCC`, and `IACR`. Informal publications, including IACR ePrint, are gray; journals are violet, conferences blue, artifacts brown, and monographs yellow.
-- The citation cart starts **On**. Click a row to copy the preferred `DBLP:` key and add it to the cart, or click a venue pill to choose a specific version. The default version favors a journal, then a conference. A small cart icon appears beside each pill while the cart is on.
-- Switch the citation cart **Off** to make a row or venue pill open that publication's web link instead. The switch is saved in the browser, and turning the cart off keeps its existing keys for later.
+- The citation cart starts **Off** on every page load, so a row or venue pill opens that publication's web link. Turn it **On** to copy a `DBLP:` key and add it to the cart when clicking a row, or click a venue pill to choose a specific version. The default version favors a journal, then a conference. A small cart icon appears beside each pill while the cart is on.
+- Turning the cart off keeps its existing keys for later. Cart keys remain saved in the browser; the On/Off switch resets to Off on reload.
 - **Show** opens a cart-only view. **Checkout** collects full BibTeX entries and copies them to the clipboard or downloads a `.bib` file. Keys persist in the browser's local storage. Full BibTeX is fetched only at checkout.
 
 The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
