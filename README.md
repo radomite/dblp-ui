@@ -16,7 +16,7 @@ The service has no authentication. The page and API send `noindex` headers, but 
 ## Search page
 
 - Search titles, topics, venue acronyms, and authors. Author autocomplete ignores accents; for example, `Daniel Marx` suggests `Dániel Marx`.
-- Filter by journals, conferences, monographs, artifacts, informal publications, or other records. Click a type to select it, Shift-click to add types, or click × to show all types. Counts refer to result groups loaded so far.
+- Filter by journal, conference, monographs, artifacts, informal publications, or other records. Click a type to show only that type; click it again to show all types. Counts refer to result groups loaded so far, with `+` while more author results remain unread.
 - Results load as you scroll and are ordered by their newest publication year. A row groups versions with the same complete author set and matching titles, allowing punctuation differences, common edition notes, and small typos.
 - Venue pills show the year below the venue. `CoRR`, `Electron. Colloquium Comput. Complex.`, and `IACR Cryptol. ePrint Arch.` display as `arXiv`, `ECCC`, and `IACR`. Informal publications, including IACR ePrint, are gray; journals are violet, conferences blue, artifacts brown, and monographs yellow.
 - The citation cart starts **On**. Click a row to copy the preferred `DBLP:` key and add it to the cart, or click a venue pill to choose a specific version. The default version favors a journal, then a conference. A small cart icon appears beside each pill while the cart is on.

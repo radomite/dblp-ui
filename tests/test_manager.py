@@ -240,6 +240,9 @@ class ManagerTests(unittest.TestCase):
                         self.assertIn('id="toggle-cart-mode"', html)
                         self.assertIn('role="switch"', html)
                         self.assertIn('function publicationLink(item)', html)
+                        self.assertIn('data-category="journal" aria-pressed="true">Journal</button>', html)
+                        self.assertIn('data-category="conference" aria-pressed="true">Conference</button>', html)
+                        self.assertNotIn('id="clear-types"', html)
                         self.assertIn('name="checkout-mode"', html)
                         self.assertNotIn('id="save-cart"', html)
                     keys = ["journals/example/One", "conf/icml/Two"]
