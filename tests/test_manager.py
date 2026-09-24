@@ -237,6 +237,9 @@ class ManagerTests(unittest.TestCase):
                         self.assertIn("Add best reference for", html)
                         self.assertIn('id="show-cart"', html)
                         self.assertIn('id="reset-cart"', html)
+                        self.assertIn('id="toggle-cart-mode"', html)
+                        self.assertIn('role="switch"', html)
+                        self.assertIn('function publicationLink(item)', html)
                         self.assertIn('name="checkout-mode"', html)
                         self.assertNotIn('id="save-cart"', html)
                     keys = ["journals/example/One", "conf/icml/Two"]

@@ -19,7 +19,8 @@ The service has no authentication. The page and API send `noindex` headers, but 
 - Filter by journals, conferences, monographs, artifacts, informal publications, or other records. Click a type to select it, Shift-click to add types, or click × to show all types. Counts refer to result groups loaded so far.
 - Results load as you scroll and are ordered by their newest publication year. A row groups versions with the same complete author set and matching titles, allowing punctuation differences, common edition notes, and small typos.
 - Venue pills show the year below the venue. `CoRR`, `Electron. Colloquium Comput. Complex.`, and `IACR Cryptol. ePrint Arch.` display as `arXiv`, `ECCC`, and `IACR`. Informal publications, including IACR ePrint, are gray; journals are violet, conferences blue, artifacts brown, and monographs yellow.
-- Click a row to copy the preferred `DBLP:` key and add it to the citation cart. The default version favors a journal, then a conference. Click a venue pill to choose a specific version instead.
+- The citation cart starts **On**. Click a row to copy the preferred `DBLP:` key and add it to the cart, or click a venue pill to choose a specific version. The default version favors a journal, then a conference. A small cart icon appears beside each pill while the cart is on.
+- Switch the citation cart **Off** to make a row or venue pill open that publication's web link instead. The switch is saved in the browser, and turning the cart off keeps its existing keys for later.
 - **Show** opens a cart-only view. **Checkout** collects full BibTeX entries and copies them to the clipboard or downloads a `.bib` file. Keys persist in the browser's local storage. Full BibTeX is fetched only at checkout.
 
 The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
