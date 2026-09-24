@@ -24,7 +24,7 @@ The service has no authentication. The page and API send `noindex` headers, but 
 - Turning the cart off keeps its existing keys for later. Cart keys remain saved in the browser; the On/Off switch resets to Off on reload.
 - **Show** opens a cart-only view. **Checkout** collects full BibTeX entries and copies them to the clipboard or downloads a `.bib` file. Keys persist in the browser's local storage. Full BibTeX is fetched only at checkout.
 
-Results appear as a list with gray dividers and immediate hover feedback. Selecting an author from autocomplete searches that exact name; typing an author manually keeps prefix search. The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
+Results appear as a list with gray dividers and immediate hover feedback. The first result in each publication year shows a gray year label in the gutter to its left. Selecting an author from autocomplete searches that exact name; typing an author manually keeps prefix search. The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
 
 ## Manual curation
 
