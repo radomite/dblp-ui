@@ -1,0 +1,12 @@
+{
+  "venues": {
+    "CoRR": {"label": "arXiv", "preprint": true},
+    "Electron. Colloquium Comput. Complex.": {"label": "ECCC", "preprint": true},
+    "IACR Cryptol. ePrint Arch.": {"label": "IACR", "preprint": true}
+  },
+  "key_prefixes": {
+    "journals/corr/": {"label": "arXiv", "preprint": true},
+    "journals/eccc/": {"label": "ECCC", "preprint": true},
+    "journals/iacr/": {"label": "IACR", "preprint": true}
+  }
+}

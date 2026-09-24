@@ -6,10 +6,12 @@ import re
 import sqlite3
 import unicodedata
 
+from .manual import CONSOLIDATIONS_BY_KEY, OVERRIDES
+
 FIELDS = "p.dblp_key, p.record_type, p.title, p.authors, p.year, p.venue, p.doi, p.ee, p.mdate"
 WORDS = re.compile(r"\w+", re.UNICODE)
-PREPRINT_PREFIXES = ("journals/corr/", "journals/eccc/", "journals/iacr/", "journals/hal/", "journals/ssrn/", "journals/biorxiv/", "journals/medrxiv/")
-PREPRINT_VENUES = ("corr", "eccc", "iacr cryptol. eprint arch.", "arxiv", "ssrn", "biorxiv", "medrxiv", "hal", "openreview")
+PREPRINT_PREFIXES = tuple(prefix.casefold() for prefix, rule in OVERRIDES["key_prefixes"].items() if rule.get("preprint")) + ("journals/hal/", "journals/ssrn/", "journals/biorxiv/", "journals/medrxiv/")
+PREPRINT_VENUES = tuple(venue.casefold() for venue, rule in OVERRIDES["venues"].items() if rule.get("preprint")) + ("arxiv", "ssrn", "biorxiv", "medrxiv", "hal", "openreview")
 
 
 def fold_accents(value):
@@ -83,7 +85,7 @@ def group_results(conn, hits):
             continue
         title = normalized_title(hit["title"])
         identity = author_identity(hit["authors"], hit["dblp_key"])
-        if title and hit["authors"]:
+        if hit["authors"]:
             first_author = hit["authors"].split(", ", 1)[0].casefold()
             if first_author not in author_cache:
                 by_authors = {}
@@ -94,12 +96,28 @@ def group_results(conn, hits):
                     (first_author,),
                 ):
                     author_key = author_identity(row["authors"], row["dblp_key"])
-                    by_authors.setdefault(author_key, []).append((row["id"], normalized_title(row["title"])))
+                    by_authors.setdefault(author_key, []).append((row["id"], normalized_title(row["title"]), row["dblp_key"]))
                 author_cache[first_author] = by_authors
+            candidates = author_cache[first_author].get(identity, [])
+            selected = {candidate_key for _, candidate_title, candidate_key in candidates
+                        if (title and candidate_title and same_work_title(title, candidate_title))
+                        or candidate_key in CONSOLIDATIONS_BY_KEY.get(hit["dblp_key"], ())}
+            # Follow explicit links and the ordinary title matches of linked records.
+            # This makes the group independent of which version was the search hit.
+            if any(key in CONSOLIDATIONS_BY_KEY for key in selected):
+                while True:
+                    linked = set().union(*(CONSOLIDATIONS_BY_KEY.get(key, ()) for key in selected))
+                    titles = [candidate_title for _, candidate_title, candidate_key in candidates
+                              if candidate_key in selected and candidate_title]
+                    expanded = selected | {candidate_key for _, candidate_title, candidate_key in candidates
+                                           if candidate_key in linked or
+                                           (candidate_title and any(same_work_title(candidate_title, known) for known in titles))}
+                    if expanded == selected:
+                        break
+                    selected = expanded
             versions = [row_dict(conn.execute(
                 f"SELECT {FIELDS} FROM publications p WHERE p.id=?", (publication_id,)
-            ).fetchone()) for publication_id, candidate_title in author_cache[first_author].get(identity, [])
-                if same_work_title(title, candidate_title)]
+            ).fetchone()) for publication_id, _, candidate_key in candidates if candidate_key in selected]
         else:
             versions = [hit]
         if not versions:

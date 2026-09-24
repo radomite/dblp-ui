@@ -9,6 +9,7 @@ import sqlite3
 from urllib.parse import parse_qs, urlparse
 
 from . import carts, search
+from .manual import OVERRIDES
 from .importer import SCHEMA_VERSION
 
 DB_PATH = Path(os.environ.get("DBLP_DB", "dblp.sqlite3"))
@@ -42,7 +43,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/":
-            body = HTML.read_bytes()
+            config = json.dumps(OVERRIDES, ensure_ascii=False).replace("<", "\\u003c")
+            body = HTML.read_text(encoding="utf-8").replace("__MANUAL_OVERRIDES_JSON__", config).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))

@@ -24,6 +24,18 @@ The service has no authentication. The page and API send `noindex` headers, but 
 
 The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
 
+## Manual curation
+
+Edit [`app/manual_overrides.json`](app/manual_overrides.json) to change venue labels or classify venues and dblp key prefixes as preprints. The checked-in rules display CoRR as arXiv, the Electronic Colloquium as ECCC, and IACR ePrint as IACR. Their `preprint` flags also control search filters and preferred-reference ranking.
+
+Edit [`app/manual_consolidations.json`](app/manual_consolidations.json) to link records whose titles changed while the publication remained the same. Add an entry to `groups`, for example:
+
+```json
+{"keys": ["journals/corr/Example26", "conf/example/Example27"], "note": "Renamed conference version of the preprint"}
+```
+
+Use the actual dblp keys from search results. An explicit link can cross title changes, but records are grouped only when their complete author sets match. Missing keys have no effect. Changes take effect when the app restarts; the SQLite index does not need to be rebuilt.
+
 ## Data refresh
 
 The app chooses one random local time on days 1–3 of each month between 01:00 and 03:59 to download the current snapshot. The default timezone is `Europe/Berlin`; set `DBLP_TIMEZONE` to another IANA timezone if needed. The scheduled time survives container restarts. Failed updates retry hourly.

@@ -39,6 +39,7 @@
   <section id="similar"></section>
 </main>
 <script>
+const MANUAL_OVERRIDES=__MANUAL_OVERRIDES_JSON__;
 const form=document.querySelector('#form'), results=document.querySelector('#results'), sentinel=document.querySelector('#load-sentinel'), more=document.querySelector('#more'), similar=document.querySelector('#similar');
 let offset=0, requestId=0, loading=false, hasMore=false, seenTitles=new Set(),emptyPages=0,autoLoadPaused=false;
 function el(tag,text,cls){const node=document.createElement(tag);if(text!=null)node.textContent=text;if(cls)node.className=cls;return node}
@@ -60,7 +61,7 @@ function prepareAuthors(span,value){span._authorNames=cleanAuthors(value);span.t
 let authorResizeFrame;window.addEventListener('resize',()=>{cancelAnimationFrame(authorResizeFrame);authorResizeFrame=requestAnimationFrame(()=>{for(const span of document.querySelectorAll('.row-authors'))fitAuthors(span)})});
 function updateRowHighlights(){const keys=new Set(cart);for(const row of document.querySelectorAll('.result-row[data-keys]')){row.classList.toggle('in-cart',JSON.parse(row.dataset.keys).some(key=>keys.has(key)));for(const pill of row.querySelectorAll('.venue-pill[data-key]'))pill.classList.toggle('in-cart',keys.has(pill.dataset.key))}}
 async function addToCart(item){const already=cart.includes(item.dblp_key),full=!already&&cart.length>=1000;if(!already&&!full){cart.push(item.dblp_key);cartChanged()}const copied=await copyText('DBLP:'+item.dblp_key);feedback(full?(copied?'Key copied; cart limit reached (1,000 keys).':'Cart limit reached (1,000 keys); clipboard access failed.'):copied?(already?'Key copied; already in citation cart.':'Key copied and added to citation cart.'):(already?'Already in citation cart; clipboard access failed.':'Added to citation cart; clipboard access failed.'))}
-function venueLabel(version){const venue=version.venue||version.reference_type||version.record_type||'Venue unavailable';if(venue==='CoRR')return 'arXiv';if(venue==='Electron. Colloquium Comput. Complex.')return 'ECCC';if(version.dblp_key?.startsWith('journals/iacr/')||venue==='IACR Cryptol. ePrint Arch.')return 'IACR';return venue}
+function venueLabel(version){const venue=version.venue||version.reference_type||version.record_type||'Venue unavailable';for(const [prefix,rule] of Object.entries(MANUAL_OVERRIDES.key_prefixes)){if(version.dblp_key?.startsWith(prefix)&&rule.label)return rule.label}return MANUAL_OVERRIDES.venues[venue]?.label||venue}
 function pillKind(version){const kind=version.reference_type;return ['journal','conference','monograph','artifact','preprint'].includes(kind)?kind:'other'}
 function venuePill(version,tag='button'){const label=venueLabel(version),pill=el(tag,null,'venue-pill kind-'+pillKind(version));pill.append(el('span',label));if(version.year!=null)pill.append(el('span',String(version.year),'venue-year'));return pill}
 function card(group){

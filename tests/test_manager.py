@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
 from app import manager
+from app import search as search_module
+from app.manual import OVERRIDES, load_consolidations
 from app.migrate_artifacts import migrate
 from app.importer import create_index
 from app import server as web
@@ -81,6 +83,10 @@ class ManagerTests(unittest.TestCase):
     def test_author_identity_ignores_order_but_not_people(self):
         self.assertEqual(author_identity("Ada Example, Grace Example", "one"), author_identity("Grace Example, Ada Example", "two"))
         self.assertNotEqual(author_identity("Ada Example", "one"), author_identity("Grace Example", "two"))
+
+    def test_manual_rules_are_loaded(self):
+        self.assertEqual(OVERRIDES["venues"]["IACR Cryptol. ePrint Arch."], {"label": "IACR", "preprint": True})
+        self.assertEqual(load_consolidations(), {})
 
     def test_author_autocomplete_uses_publication_count(self):
         with closing(sqlite3.connect(":memory:")) as conn:
@@ -195,6 +201,17 @@ class ManagerTests(unittest.TestCase):
                 self.assertEqual([group["dblp_key"] for group in newest["results"]], ["journals/example/Five", "journals/example/Three"])
                 self.assertEqual(search(conn, q="learning", sort="year_desc", limit=1, offset=1)["results"][0]["dblp_key"], "journals/example/Three")
                 self.assertEqual(search(conn, q="learning", limit=1)["next_offset"], 1)
+                manual_keys = frozenset(("journals/example/Three", "homepages/example/Nine", "journals/example/Five"))
+                with patch.object(search_module, "CONSOLIDATIONS_BY_KEY", {key: manual_keys for key in manual_keys}):
+                    linked = search(conn, q="learning")["results"]
+                    grace = next(group for group in linked if group["dblp_key"] == "journals/example/Three")
+                    self.assertIn("homepages/example/Nine", {version["dblp_key"] for version in grace["versions"]})
+                    self.assertIn("conf/icml/Two", {version["dblp_key"] for version in grace["versions"]})
+                    self.assertNotIn("journals/example/Five", {version["dblp_key"] for version in grace["versions"]})
+                    from_homepage = search(conn, q="Home Page")["results"]
+                    grace_from_homepage = next(group for group in from_homepage if group["dblp_key"] == "journals/example/Three")
+                    self.assertEqual({version["dblp_key"] for version in grace_from_homepage["versions"]},
+                                     {"homepages/example/Nine", "journals/example/Three", "conf/icml/Two", "journals/corr/Four"})
                 self.assertIn("journals/example/One", [group["dblp_key"] for group in search(conn, author="Ada Example")["results"]])
                 self.assertEqual(closest(conn, "databse algorithms")[0]["dblp_key"], "journals/example/One")
                 bibtex = conn.execute("SELECT bibtex FROM publications WHERE dblp_key='journals/example/One'").fetchone()[0]
