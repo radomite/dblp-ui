@@ -70,6 +70,9 @@ XML = b'''<?xml version="1.0" encoding="ISO-8859-1"?>
 <article key="journals/example/Thirteen" mdate="2026-01-12">
 <author>Martin Groher</author><title>Distinct author lookup.</title><year>2025</year><journal>Example Journal</journal>
 </article>
+<article key="journals/example/Fourteen" mdate="2026-01-13">
+<author>Mar&iacute;a N&uacute;&ntilde;ez</author><title>Accented surname lookup.</title><year>2025</year><journal>Example Journal</journal>
+</article>
 </dblp>'''
 
 
@@ -193,6 +196,11 @@ class ManagerTests(unittest.TestCase):
                 self.assertEqual({group["dblp_key"] for group in search(conn, author="Ada Example", category="monograph,artifact")["results"]}, {"books/example/Six", "data/example/Seven"})
                 self.assertEqual(search(conn, category="informal")["results"][0]["version_count"], 3)
                 self.assertEqual(search(conn, q="sample IACR", category="informal")["results"][0]["reference_type"], "preprint")
+                self.assertEqual([item["name"] for item in autocomplete(conn, "Example", "author")[:2]], ["Ada Example", "Grace Example"])
+                self.assertEqual([item["name"] for item in autocomplete(conn, "Grohe", "author")], ["Martin Grohe", "Martin Groher"])
+                self.assertEqual([item["name"] for item in autocomplete(conn, "Nunez", "author")], ["María Núñez"])
+                self.assertEqual(len(search(conn, author="Grohe")["results"]), 2)
+                self.assertEqual([item["dblp_key"] for item in search(conn, author="Nunez")["results"]], ["journals/example/Fourteen"])
                 self.assertEqual(len(search(conn, author="Martin Grohe")["results"]), 2)
                 self.assertEqual([item["dblp_key"] for item in search(conn, author="Martin Grohe", author_exact=True)["results"]], ["journals/example/Twelve"])
                 self.assertEqual([item["dblp_key"] for item in search(conn, q="distinct author", author="Martin Grohe", author_exact=True)["results"]], ["journals/example/Twelve"])

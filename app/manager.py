@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from .importer import SCHEMA_VERSION, create_index
 from .migrate_artifacts import migrate as migrate_artifacts
 from .server import DB_PATH, main as serve
-from .search import fold_accents
+from .search import fold_accents, folded_name_suffixes
 
 DATA_DIR = Path(os.environ.get("DBLP_DATA_DIR", "/data"))
 STATE_PATH = DATA_DIR / "refresh-state.json"
@@ -77,17 +77,34 @@ def read_metadata(db_path=DB_PATH):
 
 
 def ensure_author_index(db_path=DB_PATH):
-    """Build accent-insensitive author lookup once per index, without reimporting XML."""
+    """Build accent-insensitive name and surname lookups without reimporting XML."""
     with closing(sqlite3.connect(db_path)) as conn:
-        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='author_folded'").fetchone():
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='author_folded'").fetchone():
+            print("Building accent-insensitive author lookup...", flush=True)
+            conn.create_function("fold_accents", 1, fold_accents, deterministic=True)
+            conn.execute("CREATE TABLE author_folded AS SELECT fold_accents(name) AS name_folded, name, publications FROM author_names")
+            conn.execute("CREATE INDEX author_folded_name ON author_folded(name_folded)")
+            conn.commit()
+            print("Accent-insensitive author lookup ready", flush=True)
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='author_suffixes'").fetchone():
             return
-        print("Building accent-insensitive author lookup...", flush=True)
-        conn.create_function("fold_accents", 1, fold_accents, deterministic=True)
-        conn.execute("BEGIN")
-        conn.execute("CREATE TABLE author_folded AS SELECT fold_accents(name) AS name_folded, name, publications FROM author_names")
-        conn.execute("CREATE INDEX author_folded_name ON author_folded(name_folded)")
+        print("Building author surname lookup...", flush=True)
+        conn.execute("DROP TABLE IF EXISTS author_suffixes_building")
+        conn.execute("CREATE TABLE author_suffixes_building (suffix_folded TEXT NOT NULL, name_norm TEXT NOT NULL)")
+        batch = []
+        for name_norm, name in conn.execute("SELECT name_norm,name FROM author_names"):
+            batch.extend((suffix, name_norm) for suffix in folded_name_suffixes(name))
+            if len(batch) >= 20_000:
+                conn.executemany("INSERT INTO author_suffixes_building VALUES (?,?)", batch)
+                conn.commit()
+                batch.clear()
+        if batch:
+            conn.executemany("INSERT INTO author_suffixes_building VALUES (?,?)", batch)
+            conn.commit()
+        conn.execute("CREATE INDEX author_suffixes_building_lookup ON author_suffixes_building(suffix_folded, name_norm)")
+        conn.execute("ALTER TABLE author_suffixes_building RENAME TO author_suffixes")
         conn.commit()
-        print("Accent-insensitive author lookup ready", flush=True)
+        print("Author surname lookup ready", flush=True)
 
 
 def download_archive(url, target, min_bytes=10_000_000):

@@ -7,7 +7,7 @@ from pathlib import Path
 import sqlite3
 
 from .importer import INSERT_PUBLICATION, SCHEMA_VERSION, records
-from .search import fold_accents
+from .search import fold_accents, folded_name_suffixes
 
 
 def migrate(xml_path, db_path):
@@ -44,6 +44,7 @@ def migrate(xml_path, db_path):
                 added += 1
                 if added % 1000 == 0:
                     print(f"Added {added:,} artifacts", flush=True)
+            has_suffixes = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='author_suffixes'").fetchone()
             for norm, count in counts.items():
                 row = conn.execute("SELECT name, publications FROM author_names WHERE name_norm=?", (norm,)).fetchone()
                 display = min(names[norm], row[0]) if row else names[norm]
@@ -59,6 +60,8 @@ def migrate(xml_path, db_path):
                 else:
                     conn.execute("INSERT INTO author_names VALUES (?,?,?)", (norm, display, total))
                     conn.execute("INSERT INTO author_folded VALUES (?,?,?)", (fold_accents(display), display, total))
+                if has_suffixes and not row:
+                    conn.executemany("INSERT INTO author_suffixes VALUES (?,?)", ((suffix, norm) for suffix in folded_name_suffixes(display)))
             conn.execute("UPDATE metadata SET value=? WHERE key='schema_version'", (SCHEMA_VERSION,))
             conn.execute("UPDATE metadata SET value=CAST(value AS INTEGER)+? WHERE key='records'", (added,))
             conn.commit()

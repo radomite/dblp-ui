@@ -15,7 +15,7 @@ The service has no authentication. The page and API send `noindex` headers, but 
 
 ## Search page
 
-- Search titles, topics, venue acronyms, and authors. Author autocomplete ignores accents; for example, `Daniel Marx` suggests `Dániel Marx`.
+- Search titles, topics, venue acronyms, and authors. Author autocomplete finds first names or surnames and ignores accents; for example, `Daniel Marx` suggests `Dániel Marx` and `Nunez` can suggest `Núñez`.
 - Filter by journal, conference, monographs, artifacts, informal publications, or other records. Click a type to show only that type; click it again to show all types. Counts refer to result groups loaded so far, with `+` while more author results remain unread.
 - The URL records the title query, author, selected type, and whether the author was chosen exactly from autocomplete. Browser Back and Forward restore the search, and copied URLs reopen it.
 - Results load as you scroll and are ordered by their newest publication year. A row groups versions with the same complete author set and matching titles, allowing punctuation differences, common edition notes, and small typos.
@@ -24,7 +24,7 @@ The service has no authentication. The page and API send `noindex` headers, but 
 - Turning the cart off keeps its existing keys for later. Cart keys remain saved in the browser; the On/Off switch resets to Off on reload.
 - **Show** opens a cart-only view. **Checkout** collects full BibTeX entries and copies them to the clipboard or downloads a `.bib` file. Keys persist in the browser's local storage. Full BibTeX is fetched only at checkout.
 
-Results appear as a list with gray dividers and immediate hover feedback. The first result in each publication year shows a gray year label in the gutter to its left. Selecting an author from autocomplete searches that exact name; typing an author manually keeps prefix search. The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
+Results appear as a list with gray dividers and immediate hover feedback. The first result in each publication year shows a gray year label in the gutter to its left. Selecting an author from autocomplete searches that exact name; typing an author manually searches first-name and surname prefixes. The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
 
 ## Manual curation
 
@@ -66,7 +66,7 @@ Responses are UTF-8 JSON. All endpoints are read-only; `/api/records` and `/api/
 | POST | `/api/records` | Records for a JSON body such as `{"keys":["journals/..."]}` |
 | POST | `/api/bibtex` | Full BibTeX for the same JSON body |
 
-`/api/search` accepts `q`, `author`, `venue`, `category`, `year_from`, `year_to`, `type`, `sort`, `limit`, and `offset`. `category` is a comma-separated subset of `journal`, `conference`, `monograph`, `artifact`, `informal`, and `other`. `sort` can be `relevance` (default), `year_desc`, or `year_asc`. A query, author, venue, or category filter is needed to return results.
+`/api/search` accepts `q`, `author`, `author_exact`, `venue`, `category`, `year_from`, `year_to`, `type`, `sort`, `limit`, and `offset`. `author` matches first-name and surname prefixes; `author_exact=1` restricts it to one complete author name. `category` is a comma-separated subset of `journal`, `conference`, `monograph`, `artifact`, `informal`, and `other`. `sort` can be `relevance` (default), `year_desc`, or `year_asc`. A query, author, venue, or category filter is needed to return results.
 
 Each search result contains the preferred reference at the top level and all matching publications in `versions`. `limit` counts matching publications before grouping, so a page can have fewer groups than its limit. Use `next_offset` for the next request while `has_more` is true. The default limit is 20, or 300 when `author` is supplied; the maximum is 300. The web page requests 300 records for the first author page and 20 for later pages.
 

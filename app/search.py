@@ -18,6 +18,11 @@ def fold_accents(value):
     return "".join(char for char in unicodedata.normalize("NFKD", value.casefold()) if not unicodedata.combining(char))
 
 
+def folded_name_suffixes(name):
+    parts = re.sub(r"\s+\d{4}$", "", fold_accents(name)).split()
+    return (" ".join(parts[index:]) for index in range(1, len(parts)))
+
+
 def match_query(query):
     words = WORDS.findall(query)[:12]
     return " AND ".join('"' + word.replace('"', '') + '"' + ('*' if i == len(words) - 1 else '') for i, word in enumerate(words))
@@ -76,6 +81,18 @@ def same_work_title(left, right):
     if min(len(left), len(right)) < 24 or abs(len(left) - len(right)) > max(3, .03 * max(len(left), len(right))):
         return False
     return SequenceMatcher(None, left, right).ratio() >= .97
+
+
+def author_condition(conn, author, exact):
+    if exact:
+        return "a.name_norm=?", [author]
+    condition = "(a.name_norm>=? AND a.name_norm<?)"
+    params = [author, author + "\uffff"]
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='author_suffixes'").fetchone():
+        folded = fold_accents(author)
+        condition += " OR a.name_norm IN (SELECT name_norm FROM author_suffixes WHERE suffix_folded>=? AND suffix_folded<?)"
+        params.extend((folded, folded + "\uffff"))
+    return "(" + condition + ")", params
 
 
 def group_results(conn, hits):
@@ -156,12 +173,9 @@ def search(conn, q="", author="", venue="", year_from=None, year_to=None, record
         clauses.append("pub_fts MATCH ?")
         params.append(" AND ".join(fts))
     if author and fts:
-        if author_exact:
-            clauses.append("EXISTS (SELECT 1 FROM publication_authors a WHERE a.publication_id=p.id AND a.name_norm=?)")
-            params.append(author)
-        else:
-            clauses.append("EXISTS (SELECT 1 FROM publication_authors a WHERE a.publication_id=p.id AND a.name_norm>=? AND a.name_norm<?)")
-            params.extend([author, author + "\uffff"])
+        condition, author_params = author_condition(conn, author, author_exact)
+        clauses.append("EXISTS (SELECT 1 FROM publication_authors a WHERE a.publication_id=p.id AND " + condition + ")")
+        params.extend(author_params)
     if year_from is not None:
         clauses.append("p.year>=?")
         params.append(year_from)
@@ -205,12 +219,9 @@ def search(conn, q="", author="", venue="", year_from=None, year_to=None, record
             return {"results": [], "has_more": False}
     join = "JOIN pub_fts ON pub_fts.rowid=p.id" if fts else ""
     if author and not fts:
-        if author_exact:
-            clauses.append("p.id IN (SELECT publication_id FROM publication_authors WHERE name_norm=?)")
-            params.append(author)
-        else:
-            clauses.append("p.id IN (SELECT publication_id FROM publication_authors WHERE name_norm>=? AND name_norm<?)")
-            params.extend([author, author + "\uffff"])
+        condition, author_params = author_condition(conn, author, author_exact)
+        clauses.append("p.id IN (SELECT a.publication_id FROM publication_authors a WHERE " + condition + ")")
+        params.extend(author_params)
     where = " AND ".join(clauses)
     if sort == "year_desc":
         order = "p.year DESC, p.id DESC"
@@ -264,11 +275,18 @@ def autocomplete(conn, q, kind="title", limit=10):
         if table == "author_names":
             norm = q.casefold()
         column = "name_folded" if table == "author_folded" else "name_norm"
-        rows = conn.execute(
+        rows = [dict(row) for row in conn.execute(
             f"SELECT name, publications FROM {table} WHERE {column}>=? AND {column}<? ORDER BY publications DESC, {column} ASC LIMIT ?",
             (norm, norm + "\uffff", limit),
-        ).fetchall()
-        return [dict(row) for row in rows]
+        )]
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='author_suffixes'").fetchone():
+            rows.extend(dict(row) for row in conn.execute(
+                "SELECT a.name,a.publications FROM author_suffixes s JOIN author_names a ON a.name_norm=s.name_norm "
+                "WHERE s.suffix_folded>=? AND s.suffix_folded<? ORDER BY a.publications DESC,a.name_norm ASC LIMIT ?",
+                (fold_accents(q), fold_accents(q) + "\uffff", max(limit * 3, 25)),
+            ))
+        unique = {row["name"]: row for row in rows}
+        return sorted(unique.values(), key=lambda row: (-row["publications"], fold_accents(row["name"])))[:limit]
     match = match_query(q)
     if not match:
         return []
