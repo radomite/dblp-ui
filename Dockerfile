@@ -5,7 +5,8 @@ WORKDIR /app
 COPY app /app/app
 COPY entrypoint.sh /app/entrypoint.sh
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/* \
-    && chmod +x /app/entrypoint.sh && useradd --uid 10001 --create-home dblp && mkdir /data && chown dblp:dblp /data
+    && sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh \
+    && useradd --uid 10001 --create-home dblp && mkdir /data && chown dblp:dblp /data
 USER dblp
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=6h CMD python -c "import json,urllib.request; assert json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/status', timeout=4))['ready']" || exit 1

@@ -2,6 +2,7 @@
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from contextlib import closing
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,7 @@ STATE_PATH = Path(os.environ.get("DBLP_DATA_DIR", "/data")) / "refresh-state.jso
 HOST = os.environ.get("DBLP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("DBLP_PORT", "8080"))
 HTML = Path(__file__).with_name("index.html")
+PUBLIC_BASE_URL = os.environ.get("DBLP_PUBLIC_BASE_URL", "").rstrip("/")
 
 
 def integer(params, key, default=None, low=None, high=None):
@@ -30,6 +32,23 @@ def integer(params, key, default=None, low=None, high=None):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def document(self, body, content_type):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def public_base_url(self):
+        if PUBLIC_BASE_URL:
+            return PUBLIC_BASE_URL
+        scheme = self.headers.get("X-Forwarded-Proto", "http").split(",", 1)[0].strip()
+        host = self.headers.get("Host", f"{HOST}:{PORT}")
+        prefix = self.headers.get("X-Forwarded-Prefix", "").rstrip("/")
+        return f"{scheme}://{host}{prefix}"
+
     def respond(self, value, status=200):
         body = json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -42,16 +61,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/":
+        if parsed.path in ("/", "/search"):
             config = json.dumps(OVERRIDES, ensure_ascii=False).replace("<", "\\u003c")
             body = HTML.read_text(encoding="utf-8").replace("__MANUAL_OVERRIDES_JSON__", config).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet")
-            self.end_headers()
-            self.wfile.write(body)
+            self.document(body, "text/html; charset=utf-8")
+            return
+        if parsed.path == "/xml/osd.xml":
+            template = escape(self.public_base_url() + "/search?app=OpenSearch&q={searchTerms}", quote=True)
+            body = ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                    "<OpenSearchDescription xmlns=\"http://a9.com/-/spec/opensearch/1.1/\">\n"
+                    "  <ShortName>dblp mirror search</ShortName>\n"
+                    "  <Description>Search the local dblp bibliography mirror.</Description>\n"
+                    "  <InputEncoding>UTF-8</InputEncoding>\n"
+                    f"  <Url type=\"text/html\" template=\"{template}\"/>\n"
+                    "  <Query role=\"example\" searchTerms=\"graph\"/>\n"
+                    "</OpenSearchDescription>\n").encode("utf-8")
+            self.document(body, "application/opensearchdescription+xml; charset=utf-8")
             return
         if not parsed.path.startswith("/api/"):
             self.respond({"error": "Not found"}, 404)

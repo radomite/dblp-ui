@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 from datetime import datetime, timezone
 from urllib.request import Request, urlopen
+from xml.etree import ElementTree
 
 from app import manager
 from app import search as search_module
@@ -236,7 +237,7 @@ class ManagerTests(unittest.TestCase):
                 self.assertIn("title = {Database älgorithms \\& tools.}", bibtex)
                 self.assertIn("pages = {1-12}", bibtex)
                 self.assertIn("doi = {10.1234/example}", bibtex)
-            with patch.object(web, "DB_PATH", db), ThreadingHTTPServer(("127.0.0.1", 0), web.Handler) as httpd:
+            with patch.object(web, "DB_PATH", db), patch.object(web, "PUBLIC_BASE_URL", "https://algodat.ur.de/dblp-api"), ThreadingHTTPServer(("127.0.0.1", 0), web.Handler) as httpd:
                 thread = threading.Thread(target=httpd.serve_forever, daemon=True)
                 thread.start()
                 try:
@@ -267,6 +268,20 @@ class ManagerTests(unittest.TestCase):
                         self.assertIn("window.addEventListener('popstate'", html)
                         self.assertIn('name="checkout-mode"', html)
                         self.assertNotIn('id="save-cart"', html)
+                        self.assertIn('href="xml/osd.xml"', html)
+                        self.assertIn('id="mirror-age"', html)
+                        self.assertIn('width:min(100% - 7rem,1400px)', html)
+                    with urlopen(base + "/search?app=OpenSearch&q=graph") as response:
+                        self.assertIn("text/html", response.headers["Content-Type"])
+                        self.assertIn("noindex", response.headers["X-Robots-Tag"])
+                        self.assertEqual(response.read().decode("utf-8"), html)
+                    with urlopen(base + "/xml/osd.xml") as response:
+                        self.assertIn("application/opensearchdescription+xml", response.headers["Content-Type"])
+                        self.assertIn("noindex", response.headers["X-Robots-Tag"])
+                        description = ElementTree.fromstring(response.read())
+                        namespace = "{http://a9.com/-/spec/opensearch/1.1/}"
+                        self.assertEqual(description.find(namespace + "Url").attrib["template"],
+                                         "https://algodat.ur.de/dblp-api/search?app=OpenSearch&q={searchTerms}")
                     keys = ["journals/example/One", "conf/icml/Two"]
                     def post(path, payload):
                         request = Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})

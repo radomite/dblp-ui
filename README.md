@@ -13,6 +13,10 @@ Open <http://localhost:8080/>. Set `DBLP_PORT` in a `.env` file to change the ho
 
 The service has no authentication. The page and API send `noindex` headers, but those do not restrict access. Add an authenticated reverse proxy if access should be limited.
 
+## Browser OpenSearch
+
+The page advertises an OpenSearch description at `/xml/osd.xml`. As with dblp, its HTML search template is `/search?app=OpenSearch&q={searchTerms}`. Such requests open the regular search page, which searches the local index; they do not contact dblp. For a reverse proxy mounted under a path, set `DBLP_PUBLIC_BASE_URL` to the full public base URL (for example, `https://algodat.ur.de/dblp-api`) so the description contains the correct search URL.
+
 ## Search page
 
 - Search titles, topics, venue acronyms, and authors. Author autocomplete finds first names or surnames and ignores accents; for example, `Daniel Marx` suggests `Dániel Marx` and `Nunez` can suggest `Núñez`.
@@ -24,7 +28,7 @@ The service has no authentication. The page and API send `noindex` headers, but 
 - Turning the cart off keeps its existing keys for later. Cart keys remain saved in the browser; the On/Off switch resets to Off on reload.
 - **Show** opens a cart-only view. **Checkout** collects full BibTeX entries and copies them to the clipboard or downloads a `.bib` file. Keys persist in the browser's local storage. Full BibTeX is fetched only at checkout.
 
-Results appear as a list with gray dividers and immediate hover feedback. The first result in each publication year shows a gray year label in the gutter to its left. Selecting an author from autocomplete searches that exact name; typing an author manually searches first-name and surname prefixes. The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
+Results appear as a centered list with gray dividers and immediate hover feedback. The narrower list reserves room for the gray year labels to its left. The small label beside Search shows how many days have passed since the last successful mirror refresh. Selecting an author from autocomplete searches that exact name; typing an author manually searches first-name and surname prefixes. The page hides dblp's numeric author suffixes and terminal periods in titles. These display changes do not alter the indexed records or BibTeX.
 
 ## Manual curation
 
